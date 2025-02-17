@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vikunja-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: vikunja-backend
+  template:
+    metadata:
+      labels:
+        app: vikunja-backend
+    spec:
+      containers:
+        - name: backend
+          image: "{{ .Values.image.backend }}"
+          ports:
+            - containerPort: 3456
+          env:
+            - name: VIKUNJA_SERVICE_FRONTENDURL
+              value: "{{ include "vikunja.frontend.host" . }}"
+            - name: VIKUNJA_CORS_ENABLE
+              value: "false"
+            - name: VIKUNJA_CORS_ORIGINS
+              value: "*"
+            - name: VIKUNJA_DATABASE_HOST
+              value: "{{ include "vikunja.database.host" . }}"
+            - name: VIKUNJA_DATABASE_TYPE
+              value: "{{ include "vikunja.database.type" . }}"
+            - name: VIKUNJA_DATABASE_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.secretName }}
+                  key: database-user
+            - name: VIKUNJA_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.secretName }}
+                  key: database-password
+          resources:
+            requests:
+              cpu: {{ .Values.resources.requests.cpu }}
+              memory: {{ .Values.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.resources.limits.cpu }}
+              memory: {{ .Values.resources.limits.memory }}
+          livenessProbe:
+            httpGet:
+              path: /api/v1/info
+              port: 3456
+          readinessProbe:
+            httpGet:
+              path: /api/v1/info
+              port: 3456
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: vikunja-backend-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: vikunja-backend
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vikunja-backend
+spec:
+  selector:
+    app: vikunja-backend
+  ports:
+    - protocol: TCP
+      port: 3456
+      targetPort: 3456
+  type: ClusterIP  # Ensures it's only accessible within the cluster
+---
+{{- if (default false .Values.prometheus.serviceMonitor.enabled) }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: backend-monitor
+spec:
+  selector:
+    matchLabels:
+      app: vikunja-backend
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+{{- end }}

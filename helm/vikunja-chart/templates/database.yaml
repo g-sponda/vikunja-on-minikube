@@ -1,0 +1,155 @@
+{{- if .Values.database.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: secret-creator
+  annotations:
+    "helm.sh/hook": pre-install
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: secret-manager
+  annotations:
+    "helm.sh/hook": pre-install
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create", "update", "get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: secret-creator-binding
+  annotations:
+    "helm.sh/hook": pre-install
+subjects:
+  - kind: ServiceAccount
+    name: secret-creator
+roleRef:
+  kind: Role
+  name: secret-manager
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-password-generator
+spec:
+  template:
+    spec:
+      serviceAccountName: secret-creator
+      restartPolicy: Never
+      containers:
+        - name: password-generator
+          image: bitnami/kubectl
+          command:
+            - /bin/sh
+            - -c
+            - |
+              if kubectl get secret {{ .Values.database.secretName }} >/dev/null 2>&1; then
+                echo "Secret exists. Updating..."
+                PASSWORD=$(kubectl get secret {{ .Values.database.secretName }} -o jsonpath='{.data.database-password}' | base64 -d)
+                if [ -z "$PASSWORD" ]; then
+                  PASSWORD=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 16)
+                fi
+              else
+                echo "Secret does not exist. Creating..."
+                PASSWORD=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 16)
+              fi
+
+              kubectl create secret generic {{ .Values.database.secretName }} \
+                --from-literal=database-user="{{ .Values.database.username }}" \
+                --from-literal=database-password="$PASSWORD" \
+                --dry-run=client -o yaml | kubectl apply -f -
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: vikunja-database
+spec:
+  serviceName: "vikunja-database"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vikunja-database
+  template:
+    metadata:
+      labels:
+        app: vikunja-database
+    spec:
+      containers:
+        - name: database
+          image: "postgres:15"
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: "vikunja"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.secretName }}
+                  key: database-user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.secretName }}
+                  key: database-password
+          volumeMounts:
+            - mountPath: /var/lib/postgresql/data
+              name: postgres-data
+        {{- if (default false .Values.prometheus.serviceMonitor.enabled) }} 
+        - name: postgres-exporter
+          image: prometheuscommunity/postgres-exporter
+          env:
+            - name: DATA_SOURCE_NAME
+              value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@localhost:5432/vikunja?sslmode=disable"
+          ports:
+            - containerPort: 9187
+        {{- end }}
+      volumes:
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vikunja-database
+spec:
+  selector:
+    app: vikunja-database
+  ports:
+    - protocol: TCP
+      port: 5432
+      targetPort: 5432
+  type: ClusterIP
+---
+{{- if (default false .Values.prometheus.serviceMonitor.enabled) }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: postgres-monitor
+spec:
+  selector:
+    matchLabels:
+      app: vikunja-database
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s
+{{- end }}
+{{- end }}

@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vikunja-frontend
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: vikunja-frontend
+  template:
+    metadata:
+      labels:
+        app: vikunja-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: "{{ .Values.image.frontend }}"
+          ports:
+            - containerPort: 80
+          env:
+            - name: VIKUNJA_API_URL
+              value: "{{ include "vikunja.api.host" . }}/api/v1"
+          resources:
+            requests:
+              cpu: {{ .Values.resources.requests.cpu }}
+              memory: {{ .Values.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.resources.limits.cpu }}
+              memory: {{ .Values.resources.limits.memory }}
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-config
+data:
+  VITE_API_URL: "http://vikunja-backend"  # Internal ClusterIP access
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: vikunja-frontend-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: vikunja-frontend
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 70
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vikunja-frontend
+spec:
+  selector:
+    app: vikunja-frontend
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+  type: ClusterIP
+---
+{{- if (default false .Values.prometheus.serviceMonitor.enabled) }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: frontend-monitor
+spec:
+  selector:
+    matchLabels:
+      app: vikunja-frontend
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s
+{{- end }}
+
