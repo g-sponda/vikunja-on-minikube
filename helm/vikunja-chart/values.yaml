@@ -1,27 +1,43 @@
-replicaCount: 2
-
 prometheus:
   serviceMonitor:
     enabled: true
 
-image:
-  frontend: "vikunja/frontend:0.22.1"
-  backend: "vikunja/api:0.22.1"
-  database: "postgres:15"
-
 database:
   enabled: true # Set to true for self-hosted, false for managed RDS
+  image: "postgres:15"
   username: "vikunja"
   secretName: "vikunja-db-secret"
+
+frontend:
+  image: "vikunja/frontend:0.22.1"
+  host: vikunja.local
+  replicaCount: 1
+  hpa:
+    minReplicas: 1
+    maxReplicas: 5
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+backend:
+  image: "vikunja/api:0.22.1"
+  host: vikunja.local
+  replicaCount: 1
+  hpa:
+    minReplicas: 2
+    maxReplicas: 5
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
 
 ingress:
   enabled: true
   host: vikunja.local
-
-resources:
-  requests:
-    cpu: "250m"
-    memory: "512Mi"
-  limits:
-    cpu: "500m"
-    memory: "1Gi"
