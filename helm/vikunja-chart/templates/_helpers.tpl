@@ -18,14 +18,14 @@
 {{- if and .Values.frontend .Values.frontend.host -}}
   {{ .Values.frontend.host }}
 {{- else -}}
-  http://vikunja-frontend.{{ include "vikunja.namespace" . }}.svc.cluster.local
+  vikunja-frontend.{{ include "vikunja.namespace" . }}.svc.cluster.local
 {{- end -}}
 {{- end -}}
 
-{{- define "vikunja.api.host" -}}
-{{- if and .Values.api .Values.api.host -}}
-  {{ .Values.api.host }}
+{{- define "vikunja.backend.host" -}}
+{{- if and .Values.backend .Values.backend.host -}}
+  {{ .Values.backend.host }}
 {{- else -}}
-  http://vikunja-backend.{{ include "vikunja.namespace" . }}.svc.cluster.local
+  vikunja-backend.{{ include "vikunja.namespace" . }}.svc.cluster.local
 {{- end -}}
 {{- end -}}
