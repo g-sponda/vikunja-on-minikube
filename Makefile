@@ -22,10 +22,7 @@ create-cluster:
 	minikube addons enable metrics-server
 
 # Install all
-install-all: install-deps install-vikunja
-
-# Install dependencies
-install-deps: install-prometheus
+install-all: install-prometheus install-vikunja
 
 # Install Prometheus
 # For some observability, let's install prometheus + grafana
@@ -66,10 +63,7 @@ upgrade-vikunja:
 	helm upgrade vikunja ./helm/vikunja-chart --namespace $(DEFAULT_K8S_NAMESPACE) --timeout $(HELM_TIMEOUT) --set database.secretName=$(VIKUNJA_DB_SECRET_NAME) 
 
 # Uninstall all resources
-uninstall-all: uninstall-vikunja uninstall-deps
-
-# Uninstall dependencies resources
-uninstall-deps: uninstall-prometheus 
+uninstall-all: uninstall-vikunja uninstall-prometheus
 
 # Uninstall Vikunja
 uninstall-vikunja:
