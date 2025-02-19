@@ -89,22 +89,5 @@ spec:
     - protocol: TCP
       port: 80
       targetPort: 80
+      name: http
   type: ClusterIP
----
-{{- if (default false .Values.prometheus.serviceMonitor.enabled) }}
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  name: vikunja-frontend-monitor
-  labels:
-    app: vikunja-frontend
-spec:
-  selector:
-    matchLabels:
-      app: vikunja-frontend
-  endpoints:
-    - port: metrics
-      path: /metrics
-      interval: 15s
-{{- end }}
-

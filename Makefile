@@ -33,9 +33,11 @@ install-prometheus:
 	helm install monitoring prometheus-community/kube-prometheus-stack \
   --namespace monitoring --create-namespace \
   --set prometheus.serviceMonitor.enabled=true \
-  --set prometheus.prometheusSpec.scrapeConfigSelector.matchLabels=null \
-	--set prometheus.prometheusSpec.serviceMonitorSelector.matchLabels=null \
-  --set prometheus.prometheusSpec.serviceMonitorNamespaceSelector.matchLabels=null \
+	--set prometheus.prometheusSpec.ruleSelectorNilUsesHelmValues=false \
+  --set prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false \
+  --set prometheus.prometheusSpec.podMonitorSelectorNilUsesHelmValues=false \
+  --set prometheus.prometheusSpec.probeSelectorNilUsesHelmValues=false \
+  --set prometheus.prometheusSpec.scrapeConfigSelectorNilUsesHelmValues=false \
   --set global.scrape_interval="15s" \
 	--timeout $(HELM_TIMEOUT)
 

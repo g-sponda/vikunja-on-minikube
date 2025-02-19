@@ -20,6 +20,8 @@ spec:
           ports:
             - containerPort: 3456
           env:
+            - name: VIKUNJA_METRICS_ENABLED
+              value: "true"
             - name: VIKUNJA_SERVICE_FRONTENDURL
               value: "http://{{ include "vikunja.frontend.host" . }}"
             - name: VIKUNJA_CORS_ENABLE
@@ -99,6 +101,7 @@ spec:
     - protocol: TCP
       port: 3456
       targetPort: 3456
+      name: http
   type: ClusterIP  # Ensures it's only accessible within the cluster
 ---
 {{- if (default false .Values.prometheus.serviceMonitor.enabled) }}
@@ -113,7 +116,7 @@ spec:
     matchLabels:
       app: vikunja-backend
   endpoints:
-    - port: "3456"
+    - port: "http"
       path: /api/v1/metrics
-      interval: 15s
+      interval: 60s
 {{- end }}
