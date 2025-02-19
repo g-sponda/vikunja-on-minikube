@@ -1,3 +1,4 @@
+{{- if .Values.ingress.enabled }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -8,6 +9,10 @@ metadata:
     nginx.ingress.kubernetes.io/session-cookie-name: "http-cookie"
     nginx.ingress.kubernetes.io/session-cookie-expires: "172800"
     nginx.ingress.kubernetes.io/session-cookie-max-age: "172800"
+    nginx.ingress.kubernetes.io/load-balance: "least_conn"  # Load balancing strategy ; least connections
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "5s"  # Connection timeout; Reduces connection establishment time.
+    nginx.ingress.kubernetes.io/proxy-buffers-number: "8"  # Number of buffers
+    nginx.ingress.kubernetes.io/keep-alive: "timeout=60s"  # Keep-alive for persistent connections; This allows persistent TCP connections, which can significantly reduce latency for repeat requests.
 spec:
   rules:
     - host: {{ .Values.ingress.host }}
@@ -27,3 +32,4 @@ spec:
                 name: vikunja-frontend
                 port:
                   number: 80
+{{- end }}
