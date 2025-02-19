@@ -92,7 +92,7 @@ spec:
     spec:
       containers:
         - name: database
-          image: "postgres:15"
+          image: "{{ .Values.database.image }}"
           ports:
             - containerPort: 5432
           env:
